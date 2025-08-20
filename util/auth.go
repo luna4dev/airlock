@@ -4,16 +4,60 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
+	"os"
+	"time"
+
+	"github.com/golang-jwt/jwt/v5"
 )
 
-func GenerateEmailToken() (string, error) {
+func GenerateEmailToken() (string, string, error) {
 	randomBytes := make([]byte, 32)
 	_, err := rand.Read(randomBytes)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
-	
-	hash := sha256.Sum256(randomBytes)
-	
-	return hex.EncodeToString(hash[:]), nil
+
+	token := hex.EncodeToString(randomBytes)
+	tokenHashByte := sha256.Sum256(randomBytes)
+	tokenHash := hex.EncodeToString(tokenHashByte[:])
+
+	return token, tokenHash, nil
+}
+
+func VerifyEmailToken(providedToken, storedTokenHash string) bool {
+	// Try new method first (hash raw bytes)
+	tokenBytes, err := hex.DecodeString(providedToken)
+	if err != nil {
+		return false
+	}
+
+	tokenHashByte := sha256.Sum256(tokenBytes)
+	providedTokenHash := hex.EncodeToString(tokenHashByte[:])
+
+	return providedTokenHash == storedTokenHash
+}
+
+type JWTClaims struct {
+	UserID string `json:"userId"`
+	jwt.RegisteredClaims
+}
+
+func GenerateBearerToken(userID string) (string, error) {
+	secret := os.Getenv("JWT_SECRET")
+	if secret == "" {
+		secret = "default-secret-change-in-production"
+	}
+
+	claims := JWTClaims{
+		UserID: userID,
+		RegisteredClaims: jwt.RegisteredClaims{
+			Issuer:    "airlock",
+			Subject:   userID,
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(30 * 24 * time.Hour)), // 30 days
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+		},
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	return token.SignedString([]byte(secret))
 }

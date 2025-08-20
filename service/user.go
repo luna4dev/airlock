@@ -58,20 +58,20 @@ func (u *UserService) GetUserByEmail(ctx context.Context, email string) (*model.
 	return &user, nil
 }
 
-func (u *UserService) UpdateUserEmailAuth(ctx context.Context, userID string, token string) error {
+func (u *UserService) UpdateUserEmailAuth(ctx context.Context, userID string, tokenHash string) error {
 	now := time.Now().UnixMilli()
-	
+
 	emailAuth := &model.EmailAuth{
-		Token:     token,
+		Token:     tokenHash,
 		SentAt:    now,
 		Completed: false,
 	}
-	
+
 	emailAuthValue, err := attributevalue.Marshal(emailAuth)
 	if err != nil {
 		return err
 	}
-	
+
 	input := &dynamodb.UpdateItemInput{
 		TableName: aws.String(u.dynamoDBService.tableName),
 		Key: map[string]types.AttributeValue{
@@ -83,7 +83,27 @@ func (u *UserService) UpdateUserEmailAuth(ctx context.Context, userID string, to
 			":updatedAt": &types.AttributeValueMemberN{Value: strconv.FormatInt(now, 10)},
 		},
 	}
-	
+
 	_, err = u.dynamoDBService.client.UpdateItem(ctx, input)
+	return err
+}
+
+func (u *UserService) CompleteEmailAuth(ctx context.Context, userID string) error {
+	now := time.Now().UnixMilli()
+	
+	input := &dynamodb.UpdateItemInput{
+		TableName: aws.String(u.dynamoDBService.tableName),
+		Key: map[string]types.AttributeValue{
+			"id": &types.AttributeValueMemberS{Value: userID},
+		},
+		UpdateExpression: aws.String("SET emailAuth.completed = :completed, lastLoginAt = :lastLoginAt, updatedAt = :updatedAt"),
+		ExpressionAttributeValues: map[string]types.AttributeValue{
+			":completed":   &types.AttributeValueMemberBOOL{Value: true},
+			":lastLoginAt": &types.AttributeValueMemberN{Value: strconv.FormatInt(now, 10)},
+			":updatedAt":   &types.AttributeValueMemberN{Value: strconv.FormatInt(now, 10)},
+		},
+	}
+	
+	_, err := u.dynamoDBService.client.UpdateItem(ctx, input)
 	return err
 }

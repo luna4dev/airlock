@@ -27,6 +27,7 @@ func main() {
 	api := router.Group("/api")
 	{
 		api.POST("/auth/email", handler.AuthEmailHandler)
+		api.GET("/auth/email/verify", handler.AuthEmailVerifyHandler)
 	}
 
 	port := os.Getenv("PORT")
