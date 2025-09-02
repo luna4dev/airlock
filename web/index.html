@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Luna4 - Authentication</title>
+    <link rel="stylesheet" href="/app/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <div class="auth-box">
+            <div class="header">
+                <h1 class="logo">Luna4</h1>
+                <h2>Access Luna4 Services</h2>
+                <p class="subtitle">Enter your email to receive an authentication link</p>
+            </div>
+
+            <form id="auth-form" class="auth-form">
+                <div class="form-group">
+                    <label for="email">Email Address</label>
+                    <input 
+                        type="email" 
+                        id="email" 
+                        name="email" 
+                        placeholder="your.email@example.com"
+                        required
+                        autocomplete="email"
+                    >
+                </div>
+                
+                <button type="submit" id="submit-btn" class="submit-btn">
+                    <span class="btn-text">Send Authentication Link</span>
+                    <span class="btn-loader" style="display: none;">
+                        <span class="spinner"></span>
+                        Sending...
+                    </span>
+                </button>
+            </form>
+
+            <div id="message" class="message" style="display: none;"></div>
+            
+            <div id="countdown" class="countdown" style="display: none;">
+                <p>Please wait <span id="countdown-timer">0</span> seconds before requesting another email.</p>
+            </div>
+
+            <div class="footer">
+                <p>This is a secure authentication system for Luna4 platform members.</p>
+                <p>If you don't have access, please contact your administrator.</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="/app/script/auth.js"></script>
+</body>
+</html>

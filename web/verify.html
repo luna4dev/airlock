@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Luna4 - Email Verification</title>
+    <link rel="stylesheet" href="/app/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <div class="auth-box">
+            <div class="header">
+                <h1 class="logo">Luna4</h1>
+                <h2>Email Verification</h2>
+                <p class="subtitle">Verifying your authentication token...</p>
+            </div>
+
+            <div id="verification-status" class="verification-status">
+                <div class="loader-container">
+                    <div class="verification-loader">
+                        <span class="spinner"></span>
+                    </div>
+                    <p>Verifying your email token...</p>
+                </div>
+            </div>
+
+            <div id="success-content" class="success-content" style="display: none;">
+                <div class="success-icon">✓</div>
+                <h3>Verification Successful!</h3>
+                <p>Welcome back! You have been successfully authenticated.</p>
+                
+                <div id="user-info" class="user-info"></div>
+                
+                <div class="token-info">
+                    <p><strong>Your access token:</strong></p>
+                    <div class="token-display">
+                        <code id="access-token"></code>
+                        <button id="copy-token" class="copy-btn" title="Copy to clipboard">📋</button>
+                    </div>
+                    <p class="token-note">Token expires in 30 days. Keep it secure!</p>
+                </div>
+
+                <div class="actions">
+                    <button id="continue-btn" class="submit-btn">Continue to Dashboard</button>
+                </div>
+            </div>
+
+            <div id="error-content" class="error-content" style="display: none;">
+                <div class="error-icon">✗</div>
+                <h3>Verification Failed</h3>
+                <div id="error-message" class="message error"></div>
+                
+                <div class="actions">
+                    <button id="retry-btn" class="submit-btn secondary">Try Again</button>
+                    <a href="/app/" class="link-btn">Request New Link</a>
+                </div>
+            </div>
+
+            <div class="footer">
+                <p>This is a secure authentication system for Luna4 platform members.</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="/app/script/verify.js"></script>
+</body>
+</html>
