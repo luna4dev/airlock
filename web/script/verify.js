@@ -129,7 +129,17 @@ class EmailVerification {
         // Parse URL parameters to get redirect
         const urlParams = new URLSearchParams(window.location.search);
         const redirect = urlParams.get('redirect');
-        const redirectUrl = redirect || '/app/dashboard';
+        let redirectUrl = redirect || '/app/dashboard';
+        
+        // Get the access token from localStorage
+        const token = localStorage.getItem('luna4_access_token');
+        
+        // Add access token to redirect URL's query parameters
+        if (token) {
+            const url = new URL(redirectUrl, window.location.origin);
+            url.searchParams.set('accesstoken', token);
+            redirectUrl = url.toString();
+        }
         
         window.location.href = redirectUrl;
     }

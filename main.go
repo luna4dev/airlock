@@ -20,6 +20,9 @@ var webFS embed.FS
 //go:embed assets/templates/*
 var templateFS embed.FS
 
+//go:embed configs/sqlite-schema/*
+var sqliteSchemaFS embed.FS
+
 func main() {
 	if err := godotenv.Load(); err != nil {
 		log.Println("No .env file found, using environment variables")
@@ -27,6 +30,16 @@ func main() {
 
 	// inject embed to services package
 	service.TemplateFS = templateFS
+
+	// Initialize SQLite service once
+	sqliteService, err := service.NewSQLiteService("data/airlock.db", &sqliteSchemaFS)
+	if err != nil {
+		log.Fatal("Failed to initialize SQLite service:", err)
+	}
+	defer sqliteService.Close()
+
+	// Initialize handlers with dependencies
+	maintenanceHandler := handler.NewMaintenanceHandler(sqliteService)
 
 	router := gin.Default()
 
@@ -43,8 +56,19 @@ func main() {
 	// API routes
 	api := router.Group("/api")
 	{
-		api.POST("/auth/email", handler.AuthEmailHandler)
-		api.GET("/auth/email/verify", handler.AuthEmailVerifyHandler)
+		// Authentication endpoints
+		auth := api.Group("/auth")
+		{
+			auth.POST("/email", handler.AuthEmailHandler)
+			auth.GET("/email/verify", handler.AuthEmailVerifyHandler)
+		}
+
+		// Maintenance endpoints
+		maintenance := api.Group("/maintenance")
+		{
+			maintenance.GET("/user", maintenanceHandler.GetUsers)
+			maintenance.POST("/user", maintenanceHandler.CreateUser)
+		}
 	}
 
 	port := os.Getenv("PORT")

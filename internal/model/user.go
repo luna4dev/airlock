@@ -2,13 +2,6 @@ package model
 
 import "time"
 
-type UserStatus string
-
-const (
-	UserStatusActive    UserStatus = "ACTIVE"
-	UserStatusSuspended UserStatus = "SUSPENDED"
-)
-
 type EmailAuth struct {
 	Token     string `json:"token" dynamodbav:"token"`
 	SentAt    int64  `json:"sentAt" dynamodbav:"sentAt"`
