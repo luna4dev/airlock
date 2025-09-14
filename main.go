@@ -68,6 +68,9 @@ func main() {
 		{
 			maintenance.GET("/user", maintenanceHandler.GetUsers)
 			maintenance.POST("/user", maintenanceHandler.CreateUser)
+			maintenance.PUT("/user/:id/suspend", maintenanceHandler.SuspendUser)
+			maintenance.PUT("/user/:id/activate", maintenanceHandler.ActivateUser)
+			maintenance.DELETE("/user/:id", maintenanceHandler.DeleteUser)
 		}
 	}
 

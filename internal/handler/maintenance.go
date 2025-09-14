@@ -93,3 +93,119 @@ func (h *MaintenanceHandler) CreateUser(c *gin.Context) {
 		"user":    user,
 	})
 }
+
+// SuspendUser sets a user's status to suspended
+func (h *MaintenanceHandler) SuspendUser(c *gin.Context) {
+	userID := c.Param("id")
+	if userID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "User ID is required"})
+		return
+	}
+
+	ctx := context.Background()
+
+	// First check if user exists
+	user, err := h.sqliteService.GetUserByID(ctx, userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve user"})
+		return
+	}
+
+	if user == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		return
+	}
+
+	// Update user status to suspended
+	err = h.sqliteService.UpdateUserStatus(ctx, userID, model.UserStatusSuspended)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to suspend user"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "User suspended successfully",
+		"user_id": userID,
+		"status":  string(model.UserStatusSuspended),
+	})
+}
+
+// ActivateUser sets a user's status to active
+func (h *MaintenanceHandler) ActivateUser(c *gin.Context) {
+	userID := c.Param("id")
+	if userID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "User ID is required"})
+		return
+	}
+
+	ctx := context.Background()
+
+	// First check if user exists
+	user, err := h.sqliteService.GetUserByID(ctx, userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve user"})
+		return
+	}
+
+	if user == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		return
+	}
+
+	// Update user status to active
+	err = h.sqliteService.UpdateUserStatus(ctx, userID, model.UserStatusActive)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to activate user"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "User activated successfully",
+		"user_id": userID,
+		"status":  string(model.UserStatusActive),
+	})
+}
+
+// DeleteUser permanently deletes a user (only if suspended)
+func (h *MaintenanceHandler) DeleteUser(c *gin.Context) {
+	userID := c.Param("id")
+	if userID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "User ID is required"})
+		return
+	}
+
+	ctx := context.Background()
+
+	// First check if user exists
+	user, err := h.sqliteService.GetUserByID(ctx, userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve user"})
+		return
+	}
+
+	if user == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		return
+	}
+
+	// Check if user is suspended before allowing deletion
+	if user.Status != model.UserStatusSuspended {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "User must be suspended before deletion",
+			"current_status": string(user.Status),
+		})
+		return
+	}
+
+	// Delete the user
+	err = h.sqliteService.DeleteUser(ctx, userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete user"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "User deleted successfully",
+		"user_id": userID,
+	})
+}

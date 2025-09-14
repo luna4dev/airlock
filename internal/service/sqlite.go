@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/luna4dev/airlock/internal/model"
 	_ "github.com/mattn/go-sqlite3"
@@ -145,6 +146,77 @@ func (s *SQLiteService) CreateUser(ctx context.Context, user *model.Luna4User) e
 	)
 
 	return err
+}
+
+func (s *SQLiteService) GetUserByID(ctx context.Context, userID string) (*model.Luna4User, error) {
+	query := `
+		SELECT id, email, status, created_at, updated_at, last_login_at
+		FROM luna4_users
+		WHERE id = ?
+	`
+
+	row := s.db.QueryRowContext(ctx, query, userID)
+
+	var user model.Luna4User
+	var lastLoginAt sql.NullInt64
+
+	err := row.Scan(
+		&user.ID,
+		&user.Email,
+		&user.Status,
+		&user.CreatedAt,
+		&user.UpdatedAt,
+		&lastLoginAt,
+	)
+
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("failed to get user by ID: %w", err)
+	}
+
+	if lastLoginAt.Valid {
+		user.LastLoginAt = &lastLoginAt.Int64
+	}
+
+	return &user, nil
+}
+
+func (s *SQLiteService) UpdateUserStatus(ctx context.Context, userID string, status model.UserStatus) error {
+	query := `
+		UPDATE luna4_users
+		SET status = ?, updated_at = ?
+		WHERE id = ?
+	`
+
+	now := time.Now().UnixMilli()
+	_, err := s.db.ExecContext(ctx, query, status, now, userID)
+	if err != nil {
+		return fmt.Errorf("failed to update user status: %w", err)
+	}
+
+	return nil
+}
+
+func (s *SQLiteService) DeleteUser(ctx context.Context, userID string) error {
+	query := `DELETE FROM luna4_users WHERE id = ?`
+
+	result, err := s.db.ExecContext(ctx, query, userID)
+	if err != nil {
+		return fmt.Errorf("failed to delete user: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("no user found with ID: %s", userID)
+	}
+
+	return nil
 }
 
 func (s *SQLiteService) Close() error {
