@@ -67,6 +67,7 @@ func main() {
 		maintenance := api.Group("/maintenance")
 		{
 			maintenance.GET("/user", maintenanceHandler.GetUsers)
+			maintenance.GET("/user/:id", maintenanceHandler.GetUser)
 			maintenance.POST("/user", maintenanceHandler.CreateUser)
 			maintenance.PUT("/user/:id/suspend", maintenanceHandler.SuspendUser)
 			maintenance.PUT("/user/:id/activate", maintenanceHandler.ActivateUser)

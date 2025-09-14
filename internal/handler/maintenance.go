@@ -5,10 +5,10 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/luna4dev/airlock/internal/model"
-	"github.com/luna4dev/airlock/internal/service"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/luna4dev/airlock/internal/model"
+	"github.com/luna4dev/airlock/internal/service"
 )
 
 // MaintenanceHandler struct holds the SQLite service dependency
@@ -31,7 +31,7 @@ func (h *MaintenanceHandler) Status(c *gin.Context) {
 	})
 }
 
-// GetUsers returns all users using injected SQLite service
+// GetUsers returns all users with their services using injected SQLite service
 func (h *MaintenanceHandler) GetUsers(c *gin.Context) {
 	ctx := context.Background()
 	users, err := h.sqliteService.GetAllUsers(ctx)
@@ -40,16 +40,90 @@ func (h *MaintenanceHandler) GetUsers(c *gin.Context) {
 		return
 	}
 
+	// Create response with users and their services
+	type UserWithServices struct {
+		*model.Luna4User
+		Services []model.Luna4UserService `json:"services"`
+	}
+
+	var usersWithServices []UserWithServices
+	for _, user := range users {
+		services, err := h.sqliteService.GetUserServices(ctx, user.ID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve user services"})
+			return
+		}
+
+		userWithServices := UserWithServices{
+			Luna4User: user,
+			Services:  services,
+		}
+		usersWithServices = append(usersWithServices, userWithServices)
+	}
+
 	c.JSON(http.StatusOK, gin.H{
-		"users": users,
-		"count": len(users),
+		"users": usersWithServices,
+		"count": len(usersWithServices),
+	})
+}
+
+// GetUser returns a single user with their services by ID
+func (h *MaintenanceHandler) GetUser(c *gin.Context) {
+	userID := c.Param("id")
+	if userID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "User ID is required"})
+		return
+	}
+
+	ctx := context.Background()
+
+	// Get user by ID
+	user, err := h.sqliteService.GetUserByID(ctx, userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve user"})
+		return
+	}
+
+	if user == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		return
+	}
+
+	// Get user's services
+	services, err := h.sqliteService.GetUserServices(ctx, userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve user services"})
+		return
+	}
+
+	// Create response with user and services
+	type UserWithServices struct {
+		*model.Luna4User
+		Services []model.Luna4UserService `json:"services"`
+	}
+
+	userWithServices := UserWithServices{
+		Luna4User: user,
+		Services:  services,
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"user": userWithServices,
 	})
 }
 
 // CreateUserRequest represents the request payload for creating a user
 type CreateUserRequest struct {
-	Email  string `json:"email" binding:"required"`
-	Status string `json:"status"`
+	Email    string                     `json:"email" binding:"required"`
+	Status   string                     `json:"status"`
+	Services []CreateUserServiceRequest `json:"services,omitempty"`
+}
+
+// CreateUserServiceRequest represents service permissions for user creation
+type CreateUserServiceRequest struct {
+	Service    string `json:"service"`
+	Permission string `json:"permission"`
+	ExpiresAt  *int64 `json:"expiresAt,omitempty"`
 }
 
 // CreateUser creates a new user using injected SQLite service
@@ -73,8 +147,9 @@ func (h *MaintenanceHandler) CreateUser(c *gin.Context) {
 	}
 
 	// Create new user
+	userID := uuid.New().String()
 	user := &model.Luna4User{
-		ID:        uuid.New().String(),
+		ID:        userID,
 		Email:     req.Email,
 		Status:    status,
 		CreatedAt: time.Now().UnixMilli(),
@@ -88,9 +163,45 @@ func (h *MaintenanceHandler) CreateUser(c *gin.Context) {
 		return
 	}
 
+	// Handle services - use provided services or default PRUNK-USER
+	var servicesToCreate []model.Luna4UserService
+	if len(req.Services) > 0 {
+		// Use provided services
+		for _, svc := range req.Services {
+			userService := model.Luna4UserService{
+				ID:         uuid.New().String(),
+				UserID:     userID,
+				Service:    model.Luna4Service(svc.Service),
+				Permission: model.UserServicePermission(svc.Permission),
+				ExpiresAt:  svc.ExpiresAt,
+			}
+			servicesToCreate = append(servicesToCreate, userService)
+		}
+	} else {
+		// Create default PRUNK-USER service
+		defaultService := model.Luna4UserService{
+			ID:         uuid.New().String(),
+			UserID:     userID,
+			Service:    model.Luna4ServicePrunk,
+			Permission: model.UserServiceUser,
+			ExpiresAt:  nil, // No expiry
+		}
+		servicesToCreate = append(servicesToCreate, defaultService)
+	}
+
+	// Create user services
+	for _, userService := range servicesToCreate {
+		err = h.sqliteService.CreateUserService(ctx, &userService)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create user service"})
+			return
+		}
+	}
+
 	c.JSON(http.StatusCreated, gin.H{
-		"message": "User created successfully",
-		"user":    user,
+		"message":  "User created successfully",
+		"user":     user,
+		"services": servicesToCreate,
 	})
 }
 
@@ -191,7 +302,7 @@ func (h *MaintenanceHandler) DeleteUser(c *gin.Context) {
 	// Check if user is suspended before allowing deletion
 	if user.Status != model.UserStatusSuspended {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "User must be suspended before deletion",
+			"error":          "User must be suspended before deletion",
 			"current_status": string(user.Status),
 		})
 		return

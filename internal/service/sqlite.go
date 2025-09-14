@@ -219,6 +219,67 @@ func (s *SQLiteService) DeleteUser(ctx context.Context, userID string) error {
 	return nil
 }
 
+func (s *SQLiteService) CreateUserService(ctx context.Context, userService *model.Luna4UserService) error {
+	query := `
+		INSERT INTO luna4_user_service (id, user_id, service, permission, expires_at)
+		VALUES (?, ?, ?, ?, ?)
+	`
+
+	_, err := s.db.ExecContext(ctx, query,
+		userService.ID,
+		userService.UserID,
+		userService.Service,
+		userService.Permission,
+		userService.ExpiresAt,
+	)
+
+	return err
+}
+
+func (s *SQLiteService) GetUserServices(ctx context.Context, userID string) ([]model.Luna4UserService, error) {
+	query := `
+		SELECT id, user_id, service, permission, expires_at
+		FROM luna4_user_service
+		WHERE user_id = ?
+		ORDER BY service
+	`
+
+	rows, err := s.db.QueryContext(ctx, query, userID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query user services: %w", err)
+	}
+	defer rows.Close()
+
+	var services []model.Luna4UserService
+	for rows.Next() {
+		var service model.Luna4UserService
+		var expiresAt sql.NullInt64
+
+		err := rows.Scan(
+			&service.ID,
+			&service.UserID,
+			&service.Service,
+			&service.Permission,
+			&expiresAt,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan user service: %w", err)
+		}
+
+		if expiresAt.Valid {
+			service.ExpiresAt = &expiresAt.Int64
+		}
+
+		services = append(services, service)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating over service rows: %w", err)
+	}
+
+	return services, nil
+}
+
 func (s *SQLiteService) Close() error {
 	return s.db.Close()
 }
