@@ -8,6 +8,7 @@ import (
 	"os"
 
 	"github.com/luna4dev/airlock/internal/handler"
+	"github.com/luna4dev/airlock/internal/handler/maintenance"
 	"github.com/luna4dev/airlock/internal/service"
 
 	"github.com/gin-gonic/gin"
@@ -39,7 +40,8 @@ func main() {
 	defer sqliteService.Close()
 
 	// Initialize handlers with dependencies
-	maintenanceHandler := handler.NewMaintenanceHandler(sqliteService)
+	userHandler := maintenance.NewUserHandler(sqliteService)
+	userServiceHandler := maintenance.NewUserServiceHandler(sqliteService)
 
 	router := gin.Default()
 
@@ -66,12 +68,18 @@ func main() {
 		// Maintenance endpoints
 		maintenance := api.Group("/maintenance")
 		{
-			maintenance.GET("/user", maintenanceHandler.GetUsers)
-			maintenance.GET("/user/:id", maintenanceHandler.GetUser)
-			maintenance.POST("/user", maintenanceHandler.CreateUser)
-			maintenance.PUT("/user/:id/suspend", maintenanceHandler.SuspendUser)
-			maintenance.PUT("/user/:id/activate", maintenanceHandler.ActivateUser)
-			maintenance.DELETE("/user/:id", maintenanceHandler.DeleteUser)
+			// User management
+			maintenance.GET("/user", userHandler.GetUsers)
+			maintenance.GET("/user/:id", userHandler.GetUser)
+			maintenance.POST("/user", userHandler.CreateUser)
+			maintenance.PUT("/user/:id/suspend", userHandler.SuspendUser)
+			maintenance.PUT("/user/:id/activate", userHandler.ActivateUser)
+			maintenance.DELETE("/user/:id", userHandler.DeleteUser)
+
+			// User service management
+			maintenance.GET("/user/:id/service", userServiceHandler.GetUserServices)
+			maintenance.POST("/user/:id/service", userServiceHandler.AddUserService)
+			maintenance.DELETE("/user/:id/service/:serviceId", userServiceHandler.RemoveUserService)
 		}
 	}
 

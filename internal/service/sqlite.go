@@ -280,6 +280,26 @@ func (s *SQLiteService) GetUserServices(ctx context.Context, userID string) ([]m
 	return services, nil
 }
 
+func (s *SQLiteService) DeleteUserService(ctx context.Context, serviceID string) error {
+	query := `DELETE FROM luna4_user_service WHERE id = ?`
+
+	result, err := s.db.ExecContext(ctx, query, serviceID)
+	if err != nil {
+		return fmt.Errorf("failed to delete user service: %w", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to get rows affected: %w", err)
+	}
+
+	if rowsAffected == 0 {
+		return fmt.Errorf("no user service found with ID: %s", serviceID)
+	}
+
+	return nil
+}
+
 func (s *SQLiteService) Close() error {
 	return s.db.Close()
 }

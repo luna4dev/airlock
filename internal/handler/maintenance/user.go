@@ -1,4 +1,4 @@
-package handler
+package maintenance
 
 import (
 	"context"
@@ -11,20 +11,20 @@ import (
 	"github.com/luna4dev/airlock/internal/service"
 )
 
-// MaintenanceHandler struct holds the SQLite service dependency
-type MaintenanceHandler struct {
+// UserHandler struct holds the SQLite service dependency
+type UserHandler struct {
 	sqliteService *service.SQLiteService
 }
 
-// NewMaintenanceHandler creates a new maintenance handler with injected dependencies
-func NewMaintenanceHandler(sqliteService *service.SQLiteService) *MaintenanceHandler {
-	return &MaintenanceHandler{
+// NewUserHandler creates a new user handler with injected dependencies
+func NewUserHandler(sqliteService *service.SQLiteService) *UserHandler {
+	return &UserHandler{
 		sqliteService: sqliteService,
 	}
 }
 
 // Status handles maintenance status requests
-func (h *MaintenanceHandler) Status(c *gin.Context) {
+func (h *UserHandler) Status(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Maintenance endpoint",
 		"status":  "operational",
@@ -32,7 +32,7 @@ func (h *MaintenanceHandler) Status(c *gin.Context) {
 }
 
 // GetUsers returns all users with their services using injected SQLite service
-func (h *MaintenanceHandler) GetUsers(c *gin.Context) {
+func (h *UserHandler) GetUsers(c *gin.Context) {
 	ctx := context.Background()
 	users, err := h.sqliteService.GetAllUsers(ctx)
 	if err != nil {
@@ -68,7 +68,7 @@ func (h *MaintenanceHandler) GetUsers(c *gin.Context) {
 }
 
 // GetUser returns a single user with their services by ID
-func (h *MaintenanceHandler) GetUser(c *gin.Context) {
+func (h *UserHandler) GetUser(c *gin.Context) {
 	userID := c.Param("id")
 	if userID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "User ID is required"})
@@ -127,7 +127,7 @@ type CreateUserServiceRequest struct {
 }
 
 // CreateUser creates a new user using injected SQLite service
-func (h *MaintenanceHandler) CreateUser(c *gin.Context) {
+func (h *UserHandler) CreateUser(c *gin.Context) {
 	var req CreateUserRequest
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -206,7 +206,7 @@ func (h *MaintenanceHandler) CreateUser(c *gin.Context) {
 }
 
 // SuspendUser sets a user's status to suspended
-func (h *MaintenanceHandler) SuspendUser(c *gin.Context) {
+func (h *UserHandler) SuspendUser(c *gin.Context) {
 	userID := c.Param("id")
 	if userID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "User ID is required"})
@@ -242,7 +242,7 @@ func (h *MaintenanceHandler) SuspendUser(c *gin.Context) {
 }
 
 // ActivateUser sets a user's status to active
-func (h *MaintenanceHandler) ActivateUser(c *gin.Context) {
+func (h *UserHandler) ActivateUser(c *gin.Context) {
 	userID := c.Param("id")
 	if userID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "User ID is required"})
@@ -278,7 +278,7 @@ func (h *MaintenanceHandler) ActivateUser(c *gin.Context) {
 }
 
 // DeleteUser permanently deletes a user (only if suspended)
-func (h *MaintenanceHandler) DeleteUser(c *gin.Context) {
+func (h *UserHandler) DeleteUser(c *gin.Context) {
 	userID := c.Param("id")
 	if userID == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "User ID is required"})
