@@ -24,6 +24,9 @@ var templateFS embed.FS
 //go:embed configs/sqlite-schema/*
 var sqliteSchemaFS embed.FS
 
+//go:embed configs/sqlite-migration/*
+var sqliteMigrationFS embed.FS
+
 func main() {
 	if err := godotenv.Load(); err != nil {
 		log.Println("No .env file found, using environment variables")
@@ -33,7 +36,7 @@ func main() {
 	service.TemplateFS = templateFS
 
 	// Initialize SQLite service once
-	sqliteService, err := service.NewSQLiteService("data/airlock.db", &sqliteSchemaFS)
+	sqliteService, err := service.NewSQLiteService("data/airlock.db", &sqliteSchemaFS, &sqliteMigrationFS)
 	if err != nil {
 		log.Fatal("Failed to initialize SQLite service:", err)
 	}
