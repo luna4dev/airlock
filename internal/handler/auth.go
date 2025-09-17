@@ -9,11 +9,23 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
+	"github.com/luna4dev/airlock/internal/model"
 	"github.com/luna4dev/airlock/internal/service"
 	"github.com/luna4dev/airlock/internal/util"
 
 	"github.com/gin-gonic/gin"
 )
+
+type AuthHandler struct {
+	sqliteService *service.SQLiteService
+}
+
+func NewAuthHandler(sqliteService *service.SQLiteService) *AuthHandler {
+	return &AuthHandler{
+		sqliteService: sqliteService,
+	}
+}
 
 // AuthEmailRequest represents the request payload for email authentication
 type AuthEmailRequest struct {
@@ -22,7 +34,7 @@ type AuthEmailRequest struct {
 }
 
 // AuthEmailHandler handles the initial email authentication request
-func AuthEmailHandler(c *gin.Context) {
+func (h *AuthHandler) AuthEmailHandler(c *gin.Context) {
 	var req AuthEmailRequest
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -42,16 +54,10 @@ func AuthEmailHandler(c *gin.Context) {
 		return
 	}
 
-	userService, err := service.NewUserService()
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to connect to database"})
-		return
-	}
-
 	ctx := context.Background()
-	user, err := userService.GetUserByEmail(ctx, email)
+	user, err := h.sqliteService.GetUserByEmail(ctx, email)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to query database"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to get User"})
 		return
 	}
 
@@ -60,10 +66,10 @@ func AuthEmailHandler(c *gin.Context) {
 		return
 	}
 
-	// Check if email auth exists and validate debounce
-	if user.EmailAuth != nil {
+	latestEmailAuth, _ := h.sqliteService.GetLatestEmailAuth(ctx, user.ID)
+	if latestEmailAuth != nil {
 		debounceSeconds := getEmailAuthDebounce()
-		timeSinceLastSent := time.Now().UnixMilli() - user.EmailAuth.SentAt
+		timeSinceLastSent := time.Now().UnixMilli() - latestEmailAuth.SentAt
 		debounceMillis := int64(debounceSeconds * 1000)
 
 		if timeSinceLastSent < debounceMillis {
@@ -84,7 +90,17 @@ func AuthEmailHandler(c *gin.Context) {
 	}
 
 	// Update user's email auth in database
-	err = userService.UpdateUserEmailAuth(ctx, user.ID, tokenHash)
+	// Create new user
+	emailAuthID := uuid.New().String()
+	emailAuth := &model.Luna4EmailAuth{
+		ID:        emailAuthID,
+		UserID:    user.ID,
+		Token:     tokenHash,
+		SentAt:    time.Now().UnixMilli(),
+		Completed: false,
+	}
+
+	err = h.sqliteService.CreateEmailAuth(ctx, emailAuth)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update user authentication"})
 		return
@@ -116,7 +132,7 @@ func isValidEmail(email string) bool {
 }
 
 // AuthEmailVerifyHandler handles email verification and token validation
-func AuthEmailVerifyHandler(c *gin.Context) {
+func (h *AuthHandler) AuthEmailVerifyHandler(c *gin.Context) {
 	token := c.Query("token")
 	email := c.Query("email")
 
@@ -136,14 +152,8 @@ func AuthEmailVerifyHandler(c *gin.Context) {
 		return
 	}
 
-	userService, err := service.NewUserService()
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to connect to database"})
-		return
-	}
-
 	ctx := context.Background()
-	user, err := userService.GetUserByEmail(ctx, email)
+	user, err := h.sqliteService.GetUserByEmail(ctx, email)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to query database"})
 		return
@@ -154,21 +164,26 @@ func AuthEmailVerifyHandler(c *gin.Context) {
 		return
 	}
 
+	latestEmailAuth, err := h.sqliteService.GetLatestEmailAuth(ctx, user.ID)
+	if err != nil {
+
+	}
+
 	// Check if email auth exists
-	if user.EmailAuth == nil {
+	if latestEmailAuth == nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "No email authentication token found"})
 		return
 	}
 
 	// Check if token matches
-	if !util.VerifyEmailToken(token, user.EmailAuth.Token) {
+	if !util.VerifyEmailToken(token, latestEmailAuth.Token) {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Invalid authentication token"})
 		return
 	}
 
 	// Check if token has expired
 	expirySeconds := getEmailAuthExpiry()
-	timeSinceTokenSent := time.Now().UnixMilli() - user.EmailAuth.SentAt
+	timeSinceTokenSent := time.Now().UnixMilli() - latestEmailAuth.SentAt
 	expiryMillis := int64(expirySeconds * 1000)
 
 	if timeSinceTokenSent > expiryMillis {
@@ -177,13 +192,13 @@ func AuthEmailVerifyHandler(c *gin.Context) {
 	}
 
 	// Check if token has already been completed
-	if user.EmailAuth.Completed {
+	if latestEmailAuth.Completed {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Authentication token has already been used"})
 		return
 	}
 
 	// Complete email authentication and update lastLoginAt
-	err = userService.CompleteEmailAuth(ctx, user.ID)
+	err = h.sqliteService.MarkEmailAuthCompleted(ctx, user.ID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to complete authentication"})
 		return

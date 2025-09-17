@@ -6,5 +6,4 @@ type Luna4EmailAuth struct {
 	Token     string `json:"token"`
 	SentAt    int64  `json:"sentAt"`
 	Completed bool   `json:"completed"`
-	ExpiresAt int64  `json:"expiresAt"`
 }

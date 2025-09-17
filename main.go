@@ -42,6 +42,7 @@ func main() {
 	// Initialize handlers with dependencies
 	userHandler := maintenance.NewUserHandler(sqliteService)
 	userServiceHandler := maintenance.NewUserServiceHandler(sqliteService)
+	authHandler := handler.NewAuthHandler(sqliteService)
 
 	router := gin.Default()
 
@@ -61,8 +62,8 @@ func main() {
 		// Authentication endpoints
 		auth := api.Group("/auth")
 		{
-			auth.POST("/email", handler.AuthEmailHandler)
-			auth.GET("/email/verify", handler.AuthEmailVerifyHandler)
+			auth.POST("/email", authHandler.AuthEmailHandler)
+			auth.GET("/email/verify", authHandler.AuthEmailVerifyHandler)
 		}
 
 		// Maintenance endpoints
