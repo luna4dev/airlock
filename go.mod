@@ -5,13 +5,14 @@ go 1.24.4
 require (
 	github.com/aws/aws-sdk-go-v2 v1.38.0
 	github.com/aws/aws-sdk-go-v2/config v1.31.1
-	github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue v1.20.5
 	github.com/aws/aws-sdk-go-v2/service/dynamodb v1.49.0
 	github.com/aws/aws-sdk-go-v2/service/ses v1.33.1
 	github.com/gin-gonic/gin v1.10.1
 	github.com/golang-jwt/jwt/v5 v5.3.0
 	github.com/google/uuid v1.6.0
 	github.com/joho/godotenv v1.5.1
+	github.com/luna4dev/airlock-client v0.0.0-00010101000000-000000000000
+	github.com/luna4dev/utility v0.0.0-00010101000000-000000000000
 	github.com/mattn/go-sqlite3 v1.14.32
 )
 
@@ -21,7 +22,6 @@ require (
 	github.com/aws/aws-sdk-go-v2/internal/configsources v1.4.3 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.7.3 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/ini v1.8.3 // indirect
-	github.com/aws/aws-sdk-go-v2/service/dynamodbstreams v1.29.1 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.13.0 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/endpoint-discovery v1.11.3 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.13.3 // indirect
@@ -56,3 +56,7 @@ require (
 	google.golang.org/protobuf v1.34.1 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
+
+replace github.com/luna4dev/airlock-client => ../shared/airlock-client
+
+replace github.com/luna4dev/utility => ../shared/utility

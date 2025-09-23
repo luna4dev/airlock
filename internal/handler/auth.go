@@ -198,7 +198,7 @@ func (h *AuthHandler) AuthEmailVerifyHandler(c *gin.Context) {
 	}
 
 	// Complete email authentication and update lastLoginAt
-	err = h.sqliteService.MarkEmailAuthCompleted(ctx, user.ID)
+	err = h.sqliteService.MarkEmailAuthCompleted(ctx, latestEmailAuth.ID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to complete authentication"})
 		return

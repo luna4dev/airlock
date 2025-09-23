@@ -7,6 +7,8 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/luna4dev/airlock-client/alcgin"
+
 	"github.com/luna4dev/airlock/internal/handler"
 	"github.com/luna4dev/airlock/internal/handler/maintenance"
 	"github.com/luna4dev/airlock/internal/service"
@@ -85,6 +87,9 @@ func main() {
 			maintenance.POST("/user/:id/service", userServiceHandler.AddUserService)
 			maintenance.DELETE("/user/:id/service/:serviceId", userServiceHandler.RemoveUserService)
 		}
+
+		// Protect maintenance with auth middleware
+		maintenance.Use(alcgin.NewAuthMiddleware())
 	}
 
 	port := os.Getenv("PORT")

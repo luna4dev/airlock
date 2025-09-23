@@ -2,13 +2,16 @@ package maintenance
 
 import (
 	"context"
+	"log"
 	"net/http"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/luna4dev/airlock-client/alcgin"
 	"github.com/luna4dev/airlock/internal/model"
 	"github.com/luna4dev/airlock/internal/service"
+	"github.com/luna4dev/utility/l4error"
 )
 
 // UserHandler struct holds the SQLite service dependency
@@ -33,10 +36,23 @@ func (h *UserHandler) Status(c *gin.Context) {
 
 // GetUsers returns all users with their services using injected SQLite service
 func (h *UserHandler) GetUsers(c *gin.Context) {
-	ctx := context.Background()
-	users, err := h.sqliteService.GetAllUsers(ctx)
+	_, err := alcgin.RequireUserFromContext(c)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve users"})
+		log.Printf("GetUsers: Not authorized")
+		c.JSON(http.StatusUnauthorized, l4error.ErrorResponse{
+			Error:   "Unauthorized",
+			Message: "Invalid or missing token",
+		})
+		return
+	}
+
+	users, err := h.sqliteService.GetAllUsers(c)
+	if err != nil {
+		log.Printf("GetUsers: Failed to retrieve users: %v", err)
+		c.JSON(http.StatusInternalServerError, l4error.ErrorResponse{
+			Error:   "Internal Server Error",
+			Message: "Failed to retrieve users",
+		})
 		return
 	}
 
@@ -48,9 +64,13 @@ func (h *UserHandler) GetUsers(c *gin.Context) {
 
 	var usersWithServices []UserWithServices
 	for _, user := range users {
-		services, err := h.sqliteService.GetUserServices(ctx, user.ID)
+		services, err := h.sqliteService.GetUserServices(c, user.ID)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve user services"})
+			log.Printf("GetUsers: Failed to retrieve user services for user %s: %v", user.ID, err)
+			c.JSON(http.StatusInternalServerError, l4error.ErrorResponse{
+				Error:   "Internal Server Error",
+				Message: "Failed to retrieve user services",
+			})
 			return
 		}
 
@@ -71,7 +91,11 @@ func (h *UserHandler) GetUsers(c *gin.Context) {
 func (h *UserHandler) GetUser(c *gin.Context) {
 	userID := c.Param("id")
 	if userID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "User ID is required"})
+		log.Printf("GetUser: Missing user ID parameter")
+		c.JSON(http.StatusBadRequest, l4error.ErrorResponse{
+			Error:   "Bad Request",
+			Message: "User ID is required",
+		})
 		return
 	}
 
@@ -80,19 +104,31 @@ func (h *UserHandler) GetUser(c *gin.Context) {
 	// Get user by ID
 	user, err := h.sqliteService.GetUserByID(ctx, userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve user"})
+		log.Printf("GetUser: Failed to retrieve user %s: %v", userID, err)
+		c.JSON(http.StatusInternalServerError, l4error.ErrorResponse{
+			Error:   "Internal Server Error",
+			Message: "Failed to retrieve user",
+		})
 		return
 	}
 
 	if user == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		log.Printf("GetUser: User not found with ID: %s", userID)
+		c.JSON(http.StatusNotFound, l4error.ErrorResponse{
+			Error:   "Not Found",
+			Message: "User not found",
+		})
 		return
 	}
 
 	// Get user's services
 	services, err := h.sqliteService.GetUserServices(ctx, userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve user services"})
+		log.Printf("GetUser: Failed to retrieve user services for user %s: %v", userID, err)
+		c.JSON(http.StatusInternalServerError, l4error.ErrorResponse{
+			Error:   "Internal Server Error",
+			Message: "Failed to retrieve user services",
+		})
 		return
 	}
 
@@ -131,7 +167,11 @@ func (h *UserHandler) CreateUser(c *gin.Context) {
 	var req CreateUserRequest
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid JSON or missing required fields"})
+		log.Printf("CreateUser: Invalid JSON or missing required fields: %v", err)
+		c.JSON(http.StatusBadRequest, l4error.ErrorResponse{
+			Error:   "Bad Request",
+			Message: "Invalid JSON or missing required fields",
+		})
 		return
 	}
 
@@ -141,7 +181,11 @@ func (h *UserHandler) CreateUser(c *gin.Context) {
 		if req.Status == string(model.UserStatusActive) || req.Status == string(model.UserStatusSuspended) {
 			status = model.UserStatus(req.Status)
 		} else {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid status. Must be ACTIVE or SUSPENDED"})
+			log.Printf("CreateUser: Invalid status provided: %s", req.Status)
+			c.JSON(http.StatusBadRequest, l4error.ErrorResponse{
+				Error:   "Bad Request",
+				Message: "Invalid status. Must be ACTIVE or SUSPENDED",
+			})
 			return
 		}
 	}
@@ -159,7 +203,11 @@ func (h *UserHandler) CreateUser(c *gin.Context) {
 	ctx := context.Background()
 	err := h.sqliteService.CreateUser(ctx, user)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create user"})
+		log.Printf("CreateUser: Failed to create user: %v", err)
+		c.JSON(http.StatusInternalServerError, l4error.ErrorResponse{
+			Error:   "Internal Server Error",
+			Message: "Failed to create user",
+		})
 		return
 	}
 
@@ -193,7 +241,11 @@ func (h *UserHandler) CreateUser(c *gin.Context) {
 	for _, userService := range servicesToCreate {
 		err = h.sqliteService.CreateUserService(ctx, &userService)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create user service"})
+			log.Printf("CreateUser: Failed to create user service %s for user %s: %v", userService.Service, userID, err)
+			c.JSON(http.StatusInternalServerError, l4error.ErrorResponse{
+				Error:   "Internal Server Error",
+				Message: "Failed to create user service",
+			})
 			return
 		}
 	}
@@ -209,7 +261,11 @@ func (h *UserHandler) CreateUser(c *gin.Context) {
 func (h *UserHandler) SuspendUser(c *gin.Context) {
 	userID := c.Param("id")
 	if userID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "User ID is required"})
+		log.Printf("SuspendUser: Missing user ID parameter")
+		c.JSON(http.StatusBadRequest, l4error.ErrorResponse{
+			Error:   "Bad Request",
+			Message: "User ID is required",
+		})
 		return
 	}
 
@@ -218,19 +274,31 @@ func (h *UserHandler) SuspendUser(c *gin.Context) {
 	// First check if user exists
 	user, err := h.sqliteService.GetUserByID(ctx, userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve user"})
+		log.Printf("SuspendUser: Failed to retrieve user %s: %v", userID, err)
+		c.JSON(http.StatusInternalServerError, l4error.ErrorResponse{
+			Error:   "Internal Server Error",
+			Message: "Failed to retrieve user",
+		})
 		return
 	}
 
 	if user == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		log.Printf("SuspendUser: User not found with ID: %s", userID)
+		c.JSON(http.StatusNotFound, l4error.ErrorResponse{
+			Error:   "Not Found",
+			Message: "User not found",
+		})
 		return
 	}
 
 	// Update user status to suspended
 	err = h.sqliteService.UpdateUserStatus(ctx, userID, model.UserStatusSuspended)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to suspend user"})
+		log.Printf("SuspendUser: Failed to suspend user %s: %v", userID, err)
+		c.JSON(http.StatusInternalServerError, l4error.ErrorResponse{
+			Error:   "Internal Server Error",
+			Message: "Failed to suspend user",
+		})
 		return
 	}
 
@@ -245,7 +313,11 @@ func (h *UserHandler) SuspendUser(c *gin.Context) {
 func (h *UserHandler) ActivateUser(c *gin.Context) {
 	userID := c.Param("id")
 	if userID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "User ID is required"})
+		log.Printf("ActivateUser: Missing user ID parameter")
+		c.JSON(http.StatusBadRequest, l4error.ErrorResponse{
+			Error:   "Bad Request",
+			Message: "User ID is required",
+		})
 		return
 	}
 
@@ -254,19 +326,31 @@ func (h *UserHandler) ActivateUser(c *gin.Context) {
 	// First check if user exists
 	user, err := h.sqliteService.GetUserByID(ctx, userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve user"})
+		log.Printf("ActivateUser: Failed to retrieve user %s: %v", userID, err)
+		c.JSON(http.StatusInternalServerError, l4error.ErrorResponse{
+			Error:   "Internal Server Error",
+			Message: "Failed to retrieve user",
+		})
 		return
 	}
 
 	if user == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		log.Printf("ActivateUser: User not found with ID: %s", userID)
+		c.JSON(http.StatusNotFound, l4error.ErrorResponse{
+			Error:   "Not Found",
+			Message: "User not found",
+		})
 		return
 	}
 
 	// Update user status to active
 	err = h.sqliteService.UpdateUserStatus(ctx, userID, model.UserStatusActive)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to activate user"})
+		log.Printf("ActivateUser: Failed to activate user %s: %v", userID, err)
+		c.JSON(http.StatusInternalServerError, l4error.ErrorResponse{
+			Error:   "Internal Server Error",
+			Message: "Failed to activate user",
+		})
 		return
 	}
 
@@ -281,7 +365,11 @@ func (h *UserHandler) ActivateUser(c *gin.Context) {
 func (h *UserHandler) DeleteUser(c *gin.Context) {
 	userID := c.Param("id")
 	if userID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "User ID is required"})
+		log.Printf("DeleteUser: Missing user ID parameter")
+		c.JSON(http.StatusBadRequest, l4error.ErrorResponse{
+			Error:   "Bad Request",
+			Message: "User ID is required",
+		})
 		return
 	}
 
@@ -290,20 +378,29 @@ func (h *UserHandler) DeleteUser(c *gin.Context) {
 	// First check if user exists
 	user, err := h.sqliteService.GetUserByID(ctx, userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve user"})
+		log.Printf("DeleteUser: Failed to retrieve user %s: %v", userID, err)
+		c.JSON(http.StatusInternalServerError, l4error.ErrorResponse{
+			Error:   "Internal Server Error",
+			Message: "Failed to retrieve user",
+		})
 		return
 	}
 
 	if user == nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "User not found"})
+		log.Printf("DeleteUser: User not found with ID: %s", userID)
+		c.JSON(http.StatusNotFound, l4error.ErrorResponse{
+			Error:   "Not Found",
+			Message: "User not found",
+		})
 		return
 	}
 
 	// Check if user is suspended before allowing deletion
 	if user.Status != model.UserStatusSuspended {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error":          "User must be suspended before deletion",
-			"current_status": string(user.Status),
+		log.Printf("DeleteUser: User %s cannot be deleted - current status: %s", userID, user.Status)
+		c.JSON(http.StatusBadRequest, l4error.ErrorResponse{
+			Error:   "Bad Request",
+			Message: "User must be suspended before deletion",
 		})
 		return
 	}
@@ -311,7 +408,11 @@ func (h *UserHandler) DeleteUser(c *gin.Context) {
 	// Delete the user
 	err = h.sqliteService.DeleteUser(ctx, userID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete user"})
+		log.Printf("DeleteUser: Failed to delete user %s: %v", userID, err)
+		c.JSON(http.StatusInternalServerError, l4error.ErrorResponse{
+			Error:   "Internal Server Error",
+			Message: "Failed to delete user",
+		})
 		return
 	}
 
